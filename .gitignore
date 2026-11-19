@@ -44,7 +44,8 @@ Thumbs.db
 apiwatch_history.db
 *.sqlite
 *.sqlite3
-
+.venv-package-test/
+.venv*/
 # Temporary files
 *.tmp
 *.bak
