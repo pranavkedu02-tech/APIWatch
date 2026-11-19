@@ -1,5 +1,4 @@
 
-import logging
 import time
 from typing import Any
 
@@ -20,6 +19,7 @@ class APIWatch:
         transport: httpx.BaseTransport | None = None,
         *,
         config: APIWatchConfig | None = None,
+        history_db: str | None = None,
     ) -> None:
 
         if config is not None:
@@ -40,8 +40,12 @@ class APIWatch:
             transport=transport,
         )
 
-        # Monitoring history
-        self.history = APIHistory()
+        # Monitoring history.
+        # If history_db is provided, SQLite is used.
+        # Otherwise, history is stored in memory.
+        self.history = APIHistory(
+            database_path=history_db
+        )
 
     def check(
         self,
@@ -145,7 +149,6 @@ class APIWatch:
                     response_size=len(response.content),
                 )
 
-                # Store result in monitoring history
                 self.history.add(result)
 
                 return result
@@ -190,14 +193,16 @@ class APIWatch:
                     error=str(last_error),
                 )
 
-                # Store failed request in monitoring history
                 self.history.add(result)
 
                 return result
 
         elapsed = time.perf_counter() - start_time
 
-        self.logger.error("API request failed: %s", last_error)
+        self.logger.error(
+            "API request failed: %s",
+            last_error,
+        )
 
         result = APIResult(
             url=url,
@@ -233,9 +238,10 @@ class APIWatch:
         self.history.clear()
 
     def close(self) -> None:
-        """Close the underlying HTTP client."""
+        """Close HTTP client and history database."""
 
         self._client.close()
+        self.history.close()
 
     def __enter__(self) -> "APIWatch":
         return self
