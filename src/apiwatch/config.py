@@ -1,6 +1,11 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+)
 
 
 class APIWatchConfig(BaseModel):
@@ -8,6 +13,7 @@ class APIWatchConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    # HTTP configuration
     timeout: float = Field(default=10.0, gt=0)
 
     default_method: str = "GET"
@@ -33,6 +39,11 @@ class APIWatchConfig(BaseModel):
         }
     )
 
+    # Logging configuration
+    log_level: str = "INFO"
+
+    log_file: str | None = None
+
     @field_validator("default_method")
     @classmethod
     def validate_method(cls, value: str) -> str:
@@ -40,5 +51,26 @@ class APIWatchConfig(BaseModel):
 
         if not value:
             raise ValueError("HTTP method cannot be empty")
+
+        return value
+
+    @field_validator("log_level")
+    @classmethod
+    def validate_log_level(cls, value: str) -> str:
+        value = value.strip().upper()
+
+        allowed_levels = {
+            "DEBUG",
+            "INFO",
+            "WARNING",
+            "ERROR",
+            "CRITICAL",
+        }
+
+        if value not in allowed_levels:
+            raise ValueError(
+                f"Invalid log level: {value}. "
+                f"Choose from {allowed_levels}"
+            )
 
         return value

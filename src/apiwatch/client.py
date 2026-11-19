@@ -1,9 +1,12 @@
+
+import logging
 import time
 from typing import Any
 
 import httpx
 
 from apiwatch.config import APIWatchConfig
+from apiwatch.logger import setup_logger
 from apiwatch.models import APIResult
 
 
@@ -25,6 +28,12 @@ class APIWatch:
 
         self.timeout = self.config.timeout
 
+        self.logger = setup_logger(
+            name="apiwatch",
+            level=self.config.log_level,
+            log_file=self.config.log_file,
+        )
+
         self._client = httpx.Client(
             timeout=self.timeout,
             transport=transport,
@@ -39,7 +48,7 @@ class APIWatch:
         params: dict[str, Any] | None = None,
         json: Any = None,
     ) -> APIResult:
-        """Make an HTTP request with automatic retries."""
+        """Make an HTTP request with retries and logging."""
 
         method = (method or self.config.default_method).upper()
 
@@ -52,6 +61,12 @@ class APIWatch:
             **self.config.params,
             **(params or {}),
         }
+
+        self.logger.info(
+            "Checking API: %s %s",
+            method,
+            url,
+        )
 
         start_time = time.perf_counter()
 
@@ -68,7 +83,7 @@ class APIWatch:
                     json=json,
                 )
 
-                # Check if the response status should be retried
+                # Retry configured status codes
                 if (
                     response.status_code
                     in self.config.retry_status_codes
@@ -80,11 +95,42 @@ class APIWatch:
                         * self.config.backoff_factor ** attempt
                     )
 
+                    self.logger.warning(
+                        "HTTP %s received. "
+                        "Retrying attempt %s/%s in %.2f seconds",
+                        response.status_code,
+                        attempt + 2,
+                        self.config.max_retries + 1,
+                        delay,
+                    )
+
                     time.sleep(delay)
 
                     continue
 
                 elapsed = time.perf_counter() - start_time
+
+                if response.is_success:
+
+                    self.logger.info(
+                        "API check successful | "
+                        "Status: %s | "
+                        "Response time: %.4fs | "
+                        "Response size: %s bytes",
+                        response.status_code,
+                        elapsed,
+                        len(response.content),
+                    )
+
+                else:
+
+                    self.logger.error(
+                        "API check failed | "
+                        "Status: %s | "
+                        "Response time: %.4fs",
+                        response.status_code,
+                        elapsed,
+                    )
 
                 return APIResult(
                     url=str(response.url),
@@ -106,11 +152,26 @@ class APIWatch:
                         * self.config.backoff_factor ** attempt
                     )
 
+                    self.logger.warning(
+                        "Request error: %s | "
+                        "Retrying attempt %s/%s in %.2f seconds",
+                        exc,
+                        attempt + 2,
+                        self.config.max_retries + 1,
+                        delay,
+                    )
+
                     time.sleep(delay)
 
                     continue
 
                 elapsed = time.perf_counter() - start_time
+
+                self.logger.error(
+                    "API request failed after %s attempts: %s",
+                    attempt + 1,
+                    exc,
+                )
 
                 return APIResult(
                     url=url,
@@ -120,8 +181,9 @@ class APIWatch:
                     error=str(last_error),
                 )
 
-        # Safety fallback
         elapsed = time.perf_counter() - start_time
+
+        self.logger.error("API request failed: %s", last_error)
 
         return APIResult(
             url=url,
@@ -133,6 +195,7 @@ class APIWatch:
 
     def close(self) -> None:
         """Close the underlying HTTP client."""
+
         self._client.close()
 
     def __enter__(self) -> "APIWatch":
