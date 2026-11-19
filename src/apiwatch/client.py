@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 
 from apiwatch.config import APIWatchConfig
+from apiwatch.history import APIHistory
 from apiwatch.logger import setup_logger
 from apiwatch.models import APIResult
 
@@ -39,6 +40,9 @@ class APIWatch:
             transport=transport,
         )
 
+        # Monitoring history
+        self.history = APIHistory()
+
     def check(
         self,
         url: str,
@@ -48,7 +52,7 @@ class APIWatch:
         params: dict[str, Any] | None = None,
         json: Any = None,
     ) -> APIResult:
-        """Make an HTTP request with retries and logging."""
+        """Make an HTTP request with retries, logging, and history."""
 
         method = (method or self.config.default_method).upper()
 
@@ -132,7 +136,7 @@ class APIWatch:
                         elapsed,
                     )
 
-                return APIResult(
+                result = APIResult(
                     url=str(response.url),
                     method=method,
                     status_code=response.status_code,
@@ -140,6 +144,11 @@ class APIWatch:
                     is_success=response.is_success,
                     response_size=len(response.content),
                 )
+
+                # Store result in monitoring history
+                self.history.add(result)
+
+                return result
 
             except httpx.RequestError as exc:
 
@@ -173,7 +182,7 @@ class APIWatch:
                     exc,
                 )
 
-                return APIResult(
+                result = APIResult(
                     url=url,
                     method=method,
                     response_time=elapsed,
@@ -181,17 +190,47 @@ class APIWatch:
                     error=str(last_error),
                 )
 
+                # Store failed request in monitoring history
+                self.history.add(result)
+
+                return result
+
         elapsed = time.perf_counter() - start_time
 
         self.logger.error("API request failed: %s", last_error)
 
-        return APIResult(
+        result = APIResult(
             url=url,
             method=method,
             response_time=elapsed,
             is_success=False,
             error=str(last_error) if last_error else "Request failed",
         )
+
+        self.history.add(result)
+
+        return result
+
+    def get_history(
+        self,
+        url: str | None = None,
+    ) -> list[APIResult]:
+        """Return monitoring history, optionally filtered by URL."""
+
+        return self.history.get_history(url)
+
+    def get_stats(
+        self,
+        url: str | None = None,
+    ) -> dict:
+        """Return monitoring statistics, optionally filtered by URL."""
+
+        return self.history.get_stats(url)
+
+    def clear_history(self) -> None:
+        """Clear all stored monitoring history."""
+
+        self.history.clear()
 
     def close(self) -> None:
         """Close the underlying HTTP client."""
