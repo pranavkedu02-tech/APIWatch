@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 
 [project]
-name = "apiwatch"
+name = "pulseapi-toolkit"
 version = "0.1.0"
 description = "A lightweight Python toolkit for API monitoring, testing, validation, and reporting"
 readme = "README.md"
@@ -73,6 +73,7 @@ dev = [
 Homepage = "https://github.com/pranavkedu02-tech/APIWatch"
 Repository = "https://github.com/pranavkedu02-tech/APIWatch"
 Issues = "https://github.com/pranavkedu02-tech/APIWatch/issues"
+
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/apiwatch"]
