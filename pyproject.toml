@@ -70,10 +70,9 @@ dev = [
 
 
 [project.urls]
-Homepage = "https://github.com/YOUR_USERNAME/APIWatch"
-Repository = "https://github.com/YOUR_USERNAME/APIWatch"
-Issues = "https://github.com/YOUR_USERNAME/APIWatch/issues"
-
+Homepage = "https://github.com/pranavkedu02-tech/APIWatch"
+Repository = "https://github.com/pranavkedu02-tech/APIWatch"
+Issues = "https://github.com/pranavkedu02-tech/APIWatch/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/apiwatch"]
