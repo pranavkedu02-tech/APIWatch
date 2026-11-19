@@ -1,10 +1,10 @@
-
 import time
 from typing import Any
 
 import httpx
 
 from apiwatch.config import APIWatchConfig
+from apiwatch.exporter import APIExporter
 from apiwatch.history import APIHistory
 from apiwatch.logger import setup_logger
 from apiwatch.models import APIResult
@@ -40,9 +40,6 @@ class APIWatch:
             transport=transport,
         )
 
-        # Monitoring history.
-        # If history_db is provided, SQLite is used.
-        # Otherwise, history is stored in memory.
         self.history = APIHistory(
             database_path=history_db
         )
@@ -55,8 +52,12 @@ class APIWatch:
         headers: dict[str, str] | None = None,
         params: dict[str, Any] | None = None,
         json: Any = None,
+        schema: dict[str, Any] | None = None,
     ) -> APIResult:
-        """Make an HTTP request with retries, logging, and history."""
+        """
+        Make an HTTP request with retries, logging, history,
+        and optional JSON Schema response validation.
+        """
 
         method = (method or self.config.default_method).upper()
 
@@ -140,6 +141,58 @@ class APIWatch:
                         elapsed,
                     )
 
+                # ----------------------------------------
+                # JSON Schema Validation
+                # ----------------------------------------
+
+                is_valid = None
+                validation_errors = []
+
+                if schema is not None:
+
+                    # Import only when validation is requested.
+                    # This keeps jsonschema optional.
+                    from apiwatch.validator import ResponseValidator
+
+                    validator = ResponseValidator(schema)
+
+                    try:
+                        response_data = response.json()
+
+                        validation_result = validator.validate(
+                            response_data
+                        )
+
+                        is_valid = validation_result.is_valid
+                        validation_errors = validation_result.errors
+
+                        if is_valid:
+
+                            self.logger.info(
+                                "Response schema validation passed"
+                            )
+
+                        else:
+
+                            self.logger.warning(
+                                "Response schema validation failed | "
+                                "Errors: %s",
+                                validation_result.error_count,
+                            )
+
+                    except ValueError as exc:
+
+                        is_valid = False
+
+                        validation_errors = [
+                            f"Response is not valid JSON: {exc}"
+                        ]
+
+                        self.logger.warning(
+                            "Response JSON validation failed: %s",
+                            exc,
+                        )
+
                 result = APIResult(
                     url=str(response.url),
                     method=method,
@@ -147,6 +200,8 @@ class APIWatch:
                     response_time=elapsed,
                     is_success=response.is_success,
                     response_size=len(response.content),
+                    is_valid=is_valid,
+                    validation_errors=validation_errors,
                 )
 
                 self.history.add(result)
@@ -232,6 +287,40 @@ class APIWatch:
 
         return self.history.get_stats(url)
 
+    def export_history(
+        self,
+        file_path: str,
+        *,
+        format: str | None = None,
+        url: str | None = None,
+    ) -> None:
+        """
+        Export monitoring history to JSON or CSV.
+
+        Args:
+            file_path: Destination file path.
+            format: Export format. JSON or CSV.
+            url: Optional URL filter.
+        """
+
+        results = self.get_history(url)
+
+        APIExporter.export(
+            results=results,
+            file_path=file_path,
+            format=format,
+        )
+
+        self.logger.info(
+            "Monitoring history exported | "
+            "Format: %s | "
+            "Records: %s | "
+            "File: %s",
+            format or file_path.split(".")[-1],
+            len(results),
+            file_path,
+        )
+
     def clear_history(self) -> None:
         """Clear all stored monitoring history."""
 
@@ -243,7 +332,7 @@ class APIWatch:
         self._client.close()
         self.history.close()
 
-    def __enter__(self) -> "APIWatch":
+    def __enter__(self) -> "APIWatch":  # noqa: PYI034
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:

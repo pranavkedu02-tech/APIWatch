@@ -3,7 +3,7 @@ import asyncio
 
 import httpx
 
-from apiwatch import AsyncAPIWatch, APIWatchConfig
+from apiwatch import APIWatchConfig, AsyncAPIWatch
 
 
 class MockAsyncTransport(httpx.AsyncBaseTransport):

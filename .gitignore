@@ -1,29 +1,50 @@
-
 # Python
 __pycache__/
 *.py[cod]
-*.egg-info/
-dist/
-build/
+*$py.class
 
-# Virtual environment
+# Virtual environments
 venv/
 .venv/
+env/
+
+# Distribution
+build/
+dist/
+*.egg-info/
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
 
-# Type checking and linting
+# Type checking
 .mypy_cache/
+
+# Linting
 .ruff_cache/
 
 # IDE
 .vscode/
 .idea/
 
-# Environment secrets
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
 .env
 .env.*
-!.env.example
+
+# Logs
+*.log
+
+# APIWatch database
+apiwatch_history.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.bak

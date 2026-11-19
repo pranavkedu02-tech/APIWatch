@@ -248,7 +248,7 @@ class AsyncAPIWatch:
         await self._client.aclose()
         self.history.close()
 
-    async def __aenter__(self) -> "AsyncAPIWatch":
+    async def __aenter__(self) -> "AsyncAPIWatch":  # noqa: PYI034
         return self
 
     async def __aexit__(
