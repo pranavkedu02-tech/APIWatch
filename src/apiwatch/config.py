@@ -1,4 +1,3 @@
-
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -16,6 +15,23 @@ class APIWatchConfig(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
 
     params: dict[str, Any] = Field(default_factory=dict)
+
+    # Retry configuration
+    max_retries: int = Field(default=3, ge=0)
+
+    retry_delay: float = Field(default=1.0, ge=0)
+
+    backoff_factor: float = Field(default=2.0, ge=1)
+
+    retry_status_codes: set[int] = Field(
+        default_factory=lambda: {
+            429,
+            500,
+            502,
+            503,
+            504,
+        }
+    )
 
     @field_validator("default_method")
     @classmethod
